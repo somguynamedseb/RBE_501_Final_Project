@@ -17,6 +17,13 @@ classdef Robot < OM_X_arm
         L2;
         L3;
         L4;
+        s1;
+        s2;
+        s3;
+        s4;
+        Slist;
+        M;
+        
     end
     
     methods
@@ -48,16 +55,16 @@ classdef Robot < OM_X_arm
             self.L4 = 0.1334;
 
 
-            %Jakub is a chill dude
+            %Jakub is a chill dudefunction interpolate_jp(self, values, interTime)
             self.s1 = [0,0,1,0,0,0].';
             self.s2 = [0,1,0,-self.L0,0,0].';
             self.s3 = [0,1,0,-self.L0-self.L1,0,self.L2].';
             self.s4 = [0,1,0,-self.L0-self.L1,0,self.L2+self.L3].';
-            self.Slist = [s1,s2,s3,s4];
+            self.Slist = [self.s1,self.s2,self.s3,self.s4];
 
-            self.M = [[0,0,-1,self.L2+self.L3+self.L4]
-                [0,1,0,0]
-                [1,0,0,self.L0+self.L1]
+            self.M = [[0,0,-1,self.L2+self.L3+self.L4];
+                [0,1,0,0];
+                [1,0,0,self.L0+self.L1];
                 [0,0,0,1]];
         end
         
