@@ -1,0 +1,16 @@
+# Autosave extensions
+*.asv
+*.m~
+*.sav
+*.mex*
+
+# Images
+*.jpg
+*.eps
+# Other
+.DS_Store
+codegen/
+helpsearch*/
+*.mlappinstall
+*.mltbx
+src/posData.csv
