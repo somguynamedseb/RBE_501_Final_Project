@@ -216,7 +216,7 @@ classdef Robot < OM_X_arm
         % otherwise
         % GETVEL [boolean] - True if user wants velocity data, false
         % otherwise
-        function fast_readings = measured_js(self, GETPOS, GETVEL)
+        function fast_readings = measured_js(self, GETPOS, GETVEL, GETCUR)
             % Make array to store data
             fast_readings = zeros(2,4);
             
@@ -233,19 +233,23 @@ classdef Robot < OM_X_arm
                 offsets = [0, 61.8300, 65.9520, 0];
                 fast_readings(2, :) = fast_readings(2, :) - offsets;
             end
+
+            if GETCUR
+                 fast_readings(3, :) = self.bulkReadWrite(DX_XM430_W350.CURR_LEN, DX_XM430_W350.CURR_CURRENT) ./ DX_XM430_W350.TICKS_PER_mA;
+            end
         end
 
-        % Takes in a 1x4 vector [x, y, z, alpha] coordinates of the end effector
         % Outputs a 1x4 vector of joint angles to reach the desired position
         % theta_1 limits -90, 90
         % theta_2 limits -90, 90
         % theta_3 limits -100, 90
         % theta_4 limits -100, 120
-        function q = ikspace(self,target)
-            q = IKinSpace(self.Slist,M,target,[0;0;0;0],0.001,0.001);
+        function [q,s] = ikspace(self,target)
+            [q,s] = IKinSpace(self.Slist,self.M,target,[0;0;0;0],0.01,0.01);
             % return the caluclated joint angles
             % q = [theta_1 theta_2 theta_3 theta_4];
         end
+
 
         
     end % end methods
