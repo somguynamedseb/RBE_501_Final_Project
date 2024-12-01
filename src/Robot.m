@@ -250,8 +250,8 @@ classdef Robot < OM_X_arm
             % q = [theta_1 theta_2 theta_3 theta_4];
         end
         
-        function [pos_arr,vel_arr,acc_arr] = LSPB(initial_pos,target_pos,target_time)
-            dt = 0.01;
+        function [pos_arr,vel_arr,acc_arr] = LSPB(self,initial_pos,target_pos,target_time)
+            dt = 0.1;
             buffer_percent = 0.2;
             buffer_time = target_time * buffer_percent;
             current_state = [initial_pos,0,0,0,0,0,0]; %x,y,z,vx,vy,vz,ax,ay,az

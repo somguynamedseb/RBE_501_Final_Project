@@ -5,8 +5,8 @@
 %
 % Output: Robot moves to home, then A, then B
 %
-% Written by Sebastian Baldani
-%
+% Written by Sebastian Baldini & Brighton Lee
+% 12/1/2024
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
