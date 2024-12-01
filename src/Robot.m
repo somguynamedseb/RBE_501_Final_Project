@@ -249,6 +249,42 @@ classdef Robot < OM_X_arm
             % return the caluclated joint angles
             % q = [theta_1 theta_2 theta_3 theta_4];
         end
+        
+        function [pos_arr,vel_arr,acc_arr] = LSPB(initial_pos,target_pos,target_time)
+            dt = 0.01;
+            buffer_percent = 0.2;
+            buffer_time = target_time * buffer_percent;
+            current_state = [initial_pos,0,0,0,0,0,0]; %x,y,z,vx,vy,vz,ax,ay,az
+            pos_arr = [];
+            vel_arr = [];
+            acc_arr = [];
+
+            dist =  normalize((current_state(1:3)-target_pos));
+            target_vel = dist/((1-buffer_percent) * target_time);
+            target_acc = target_vel/buffer_time;
+            iterations = target_time/dt;
+
+            for i = 0:iterations
+                time = i*dt;
+            
+                if time< buffer_time   
+                    current_state(7:9) = target_acc;
+                    current_state(4:6) = current_state(4:6) + current_state(7:9) * dt;
+                    current_state(1:3) = current_state(1:3) + current_state(4:6) * dt;
+                elseif time> target_time - buffer_time   
+                    current_state(7:9) = -target_acc;
+                    current_state(4:6) = current_state(4:6) + current_state(7:9) * dt;
+                    current_state(1:3) = current_state(1:3) + current_state(4:6) * dt;
+                else
+                    current_state(7:9) = 0;
+                    current_state(4:6) = current_state(4:6) + current_state(7:9) * dt;
+                    current_state(1:3) = current_state(1:3) + current_state(4:6) * dt;
+                end
+               pos_arr(i+1,1:3) = (current_state(1:3));
+               vel_arr(i+1,1:3) = (current_state(4:6));
+               acc_arr(i+1,1:3) = (current_state(7:9));
+            end
+        end
 
 
         
