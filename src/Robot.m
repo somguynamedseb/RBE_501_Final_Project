@@ -41,10 +41,6 @@ classdef Robot < OM_X_arm
             % change here or call writeTime in scripts to change
             self.writeTime(2);
             
-            % Robot Dimensions
-            self.mDim = [96.326, 130.23, 124, 133.4]; % (mm)
-            self.mOtherDim = [128, 24]; % (mm)
-            
             % Set end goal joint positions
             self.goalJS = [0, 0, 0, 0];
             
@@ -246,7 +242,10 @@ classdef Robot < OM_X_arm
         % theta_3 limits -100, 90
         % theta_4 limits -100, 120
         function [q,s] = ikspace(self,target)
-            [q,s] = IKinSpace(self.Slist,self.M,target,[0;0;0;0],0.01,0.01);
+            initial_guess = [0;0;0;0];
+            eomg = 0.001;
+            ev = 0.001;
+            [q,s] = IKinSpace(self.Slist,self.M,target,initial_guess,eomg,ev);
             % return the caluclated joint angles
             % q = [theta_1 theta_2 theta_3 theta_4];
         end
@@ -255,6 +254,8 @@ classdef Robot < OM_X_arm
 
             buffer_percent = 0.2;
             buffer_time = target_time * buffer_percent;
+            initial_pos = initial_pos.'
+            target_pos = target_pos.'
             current_state = [initial_pos,0,0,0,0,0,0]; %x,y,z,vx,vy,vz,ax,ay,az
             pos_arr = [];
             vel_arr = [];
@@ -282,21 +283,33 @@ classdef Robot < OM_X_arm
                     current_state(1:3) = current_state(1:3) + current_state(4:6) * self.dt;
                 end
                pos_arr(i+1,1:3) = (current_state(1:3));
-               vel_arr(i+1,1:3) = (current_state(4:6));
+               vel_arr(i+1,1:3) = [current_state(4:6)];
                acc_arr(i+1,1:3) = (current_state(7:9));
             end
 
+        end
+        
+        % TODO: fix ikspace input to make it a 4x4 T matrix
+        % TODO: fix recursive algorithm
+        function [qdot_arr] = LSPBtoVel(self,pos_arr,vel_arr)
+                x = pos_arr(1,1);
+                y = pos_arr(1,2);
+                z = pos_arr(1,3);
 
-            function [J_vel] = LSPBtoVel(pos_arr,vel_arr)
+                theta1 = atan2(y,x);
+                T04 = [[0,-sin(theta1),-cos(theta1),x];
+                        [0,cos(theta1),-sin(theta1),y];
+                        [1,0,0,z];
+                        [0,0,0,1]];
 
-                J_pos = self.ikspace(pos_arr);
+                q = self.ikspace(T04);
+
                 for i = 1:size(vel_arr)
-                    J_vel(i,1:3) = (self.Slist*J_pos).' * vel_arr(i)*self.dt;
-                    J_pos = J_pos+J_vel
+                    vel = [vel_arr(i,1:3),0,0,0]';
+                    qdot_arr(i,1:4) = pinv(JacobianSpace(self.Slist,q))*vel;
+                    q = q+((qdot_arr(i,1:4))'*self.dt);
                 end
             end
-
-        end
         
 
         
