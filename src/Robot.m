@@ -23,6 +23,7 @@ classdef Robot < OM_X_arm
         s4;
         Slist;
         M;
+        dt; 
         
     end
     
@@ -53,7 +54,7 @@ classdef Robot < OM_X_arm
             self.L2 = 0.024;
             self.L3 = 0.124;
             self.L4 = 0.1334;
-
+            self.dt = 0.1;
 
             %Jakub is a chill dudefunction interpolate_jp(self, values, interTime)
             self.s1 = [0,0,1,0,0,0].';
@@ -251,7 +252,7 @@ classdef Robot < OM_X_arm
         end
         
         function [pos_arr,vel_arr,acc_arr] = LSPB(self,initial_pos,target_pos,target_time)
-            dt = 0.1;
+
             buffer_percent = 0.2;
             buffer_time = target_time * buffer_percent;
             current_state = [initial_pos,0,0,0,0,0,0]; %x,y,z,vx,vy,vz,ax,ay,az
@@ -262,30 +263,41 @@ classdef Robot < OM_X_arm
             dist =  normalize((current_state(1:3)-target_pos));
             target_vel = dist/((1-buffer_percent) * target_time);
             target_acc = target_vel/buffer_time;
-            iterations = target_time/dt;
+            iterations = target_time/self.dt;
 
             for i = 0:iterations
-                time = i*dt;
+                time = i*self.dt;
             
                 if time< buffer_time   
                     current_state(7:9) = target_acc;
-                    current_state(4:6) = current_state(4:6) + current_state(7:9) * dt;
-                    current_state(1:3) = current_state(1:3) + current_state(4:6) * dt;
+                    current_state(4:6) = current_state(4:6) + current_state(7:9) * self.dt;
+                    current_state(1:3) = current_state(1:3) + current_state(4:6) * self.dt;
                 elseif time> target_time - buffer_time   
                     current_state(7:9) = -target_acc;
-                    current_state(4:6) = current_state(4:6) + current_state(7:9) * dt;
-                    current_state(1:3) = current_state(1:3) + current_state(4:6) * dt;
+                    current_state(4:6) = current_state(4:6) + current_state(7:9) * self.dt;
+                    current_state(1:3) = current_state(1:3) + current_state(4:6) * self.dt;
                 else
                     current_state(7:9) = 0;
-                    current_state(4:6) = current_state(4:6) + current_state(7:9) * dt;
-                    current_state(1:3) = current_state(1:3) + current_state(4:6) * dt;
+                    current_state(4:6) = current_state(4:6) + current_state(7:9) * self.dt;
+                    current_state(1:3) = current_state(1:3) + current_state(4:6) * self.dt;
                 end
                pos_arr(i+1,1:3) = (current_state(1:3));
                vel_arr(i+1,1:3) = (current_state(4:6));
                acc_arr(i+1,1:3) = (current_state(7:9));
             end
-        end
 
+
+            function [J_vel] = LSPBtoVel(pos_arr,vel_arr)
+
+                J_pos = self.ikspace(pos_arr);
+                for i = 1:size(vel_arr)
+                    J_vel(i,1:3) = (self.Slist*J_pos).' * vel_arr(i)*self.dt;
+                    J_pos = J_pos+J_vel
+                end
+            end
+
+        end
+        
 
         
     end % end methods
