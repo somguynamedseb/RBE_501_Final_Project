@@ -20,14 +20,15 @@ robot = Robot();
 % 
 % % Move the robot
 % cal_home = [0,0,0,0];
-vels = [0.1;0;0;0]';
-% pause(1);
+vels = [1;0;0;0];
+pause(3);
 % robot.measured_js(1,0,0);
-% robot.interpolate_jp(cal_home, 2000);
+% robot.interpolate_jp(cal_home, 5000);
 % 
 % pause(3);
 % 
-% robot.writeMode('velocity')
-
+robot.writeMode('v')
+% 
 pause(3);
 robot.writeVelocities(vels)
+pause(3);

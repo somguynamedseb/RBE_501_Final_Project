@@ -147,8 +147,8 @@ classdef OM_X_arm < handle
                 end
         
                 % Add offset to motor 3 joint angle before writing
-                msgs(2) = msgs(2) + self.motor2_offset;
-                msgs(3) = msgs(3) + self.motor3_offset;
+                % msgs(2) = msgs(2) + self.motor2_offset;
+                % msgs(3) = msgs(3) + self.motor3_offset;
         
                 groupBulkWriteClearParam(self.groupwrite_num);
                 for i = 1:length(self.motorIDs)
