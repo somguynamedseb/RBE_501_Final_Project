@@ -34,7 +34,7 @@ classdef Robot < OM_X_arm
         function self = Robot()
             % Change robot to position mode with torque enabled by default
             % Feel free to change this as desired
-            % self.writeMode('p');
+            self.writeMode('p');
             self.writeMotorState(true);
             
             % Set the robot to move between positions with a 5 second profile
@@ -50,7 +50,7 @@ classdef Robot < OM_X_arm
             self.L2 = 0.024;
             self.L3 = 0.124;
             self.L4 = 0.1334;
-            self.dt = 0.1;
+            self.dt = 0.22;
 
             %Jakub is a chill dudefunction interpolate_jp(self, values, interTime)
             self.s1 = [0,0,1,0,0,0].';
@@ -205,6 +205,9 @@ classdef Robot < OM_X_arm
             
             % write the values
             self.writeJoints(values);
+
+            % pause to let robot move
+            pause(interTime/1000);
         end
         
         % Gets the joint positions and velocities and returns what the user
@@ -250,7 +253,7 @@ classdef Robot < OM_X_arm
             % q = [theta_1 theta_2 theta_3 theta_4];
         end
         
-        function [pos_arr,vel_arr,acc_arr] = LSPB(self,initial_pos,target_pos,target_time)
+        function [pos_arr,vel_arr,acc_arr,z_arr] = LSPB(self,initial_pos,target_pos,target_time)
 
             buffer_percent = 0.2;
             buffer_time = target_time * buffer_percent;
@@ -261,7 +264,7 @@ classdef Robot < OM_X_arm
             vel_arr = [];
             acc_arr = [];
 
-            dist =  normalize((current_state(1:3)-target_pos));
+            dist =  (current_state(1:3)-target_pos);
             target_vel = dist/((1-buffer_percent) * target_time);
             target_acc = target_vel/buffer_time;
             iterations = target_time/self.dt;
@@ -279,35 +282,52 @@ classdef Robot < OM_X_arm
                     current_state(1:3) = current_state(1:3) + current_state(4:6) * self.dt;
                 else
                     current_state(7:9) = 0;
-                    current_state(4:6) = current_state(4:6) + current_state(7:9) * self.dt;
+                    current_state(4:6) = current_state(4:6);
                     current_state(1:3) = current_state(1:3) + current_state(4:6) * self.dt;
                 end
+               
+               z_arr(i+1) = atan2(current_state(2),current_state(1))
                pos_arr(i+1,1:3) = (current_state(1:3));
                vel_arr(i+1,1:3) = [current_state(4:6)];
                acc_arr(i+1,1:3) = (current_state(7:9));
             end
+            % plot(vel_arr)
 
         end
         
         % TODO: fix ikspace input to make it a 4x4 T matrix
         % TODO: fix recursive algorithm
-        function [qdot_arr] = LSPBtoVel(self,pos_arr,vel_arr)
+        function [qdot_arr] = LSPBtoVel(self,pos_arr,vel_arr,z_arr)
                 x = pos_arr(1,1);
                 y = pos_arr(1,2);
                 z = pos_arr(1,3);
+                
+                for i = 1:(size(vel_arr)-1)
+                    theta1 = atan2(y,x);
+                    T04 = [[0,-sin(theta1),-cos(theta1),x];
+                            [0,cos(theta1),-sin(theta1),y];
+                            [1,0,0,z];
+                            [0,0,0,1]];
+                    q = self.ikspace(T04);
+                   
+                    jacobian = [
+                        0 0 0 0;
+                        0 1 1 1;
+                        1 0 0 0;
+                        0 0.128 0 0;
+                        0.28 0 0 0;
+                        0 -0.28 -0.25 -0.13;
+                    ]
 
-                theta1 = atan2(y,x);
-                T04 = [[0,-sin(theta1),-cos(theta1),x];
-                        [0,cos(theta1),-sin(theta1),y];
-                        [1,0,0,z];
-                        [0,0,0,1]];
+                    jac_vel = jacobian(4:6, :);
 
-                q = self.ikspace(T04);
-
-                for i = 1:size(vel_arr)
-                    vel = [vel_arr(i,1:3),0,0,0]';
-                    qdot_arr(i,1:4) = pinv(JacobianSpace(self.Slist,q))*vel;
-                    q = q+((qdot_arr(i,1:4))'*self.dt);
+                    vel = [vel_arr(i,1:3)]';
+                    jb = JacobianBody(jacobian,q)
+                    jbslice = jb(4:6,:)
+                    jbp= pinv(jbslice)
+                    qdot_arr(i,1:4) = (jbp*-vel);
+                    % qdot_arr(i,1:4) = pinv(jac_vel)*vel_arr(i, 1:3)';
+                    % q = q+((qdot_arr(i,1:4))'*self.dt);
                 end
             end
         
