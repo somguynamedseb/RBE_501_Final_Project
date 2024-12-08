@@ -20,7 +20,6 @@ robot = Robot();
 [velocity_input_2] = robot.LSPBtoVel(pos_arr2,vel_arr2);
 
 % Move the robot
-% cal_home = [0,0,0,0];
 phiA = -pi/4;
 T_A = [[0,-sin(phiA),-cos(phiA),0.185];
     [0,cos(phiA),-sin(phiA),-0.185];

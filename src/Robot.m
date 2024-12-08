@@ -44,21 +44,30 @@ classdef Robot < OM_X_arm
             % Set end goal joint positions
             self.goalJS = [0, 0, 0, 0];
             
-            % Set up link lengths in mm
+            % Set up link lengths in m
             self.L0 = 0.096326;
             self.L1 = 0.128;
             self.L2 = 0.024;
             self.L3 = 0.124;
             self.L4 = 0.1334;
+
+            % Set universal step size for velocity control in seconds
             self.dt = 0.22;
 
-            %Jakub is a chill dudefunction interpolate_jp(self, values, interTime)
+            % Jakub is a chill dude (define Jacobians)
             self.s1 = [0,0,1,0,0,0].';
             self.s2 = [0,1,0,-self.L0,0,0].';
             self.s3 = [0,1,0,-self.L0-self.L1,0,self.L2].';
             self.s4 = [0,1,0,-self.L0-self.L1,0,self.L2+self.L3].';
             self.Slist = [self.s1,self.s2,self.s3,self.s4];
 
+            self.b1 = [1,0,0,0,self.L2+self.L3+self.L4,0].';
+            self.b2 = [0,1,0,-self.L2-self.L3-self.L4,0,-self.L1].';
+            self.b3 = [0,1,0,-self.L3-self.L4,0,0].';
+            self.b4 = [0,1,0,-self.L4,0,0].';
+            self.Blist = [self.b1,self.b2,self.b3,self.b4];
+            
+            % Define home position
             self.M = [[0,0,-1,self.L2+self.L3+self.L4];
                 [0,1,0,0];
                 [1,0,0,self.L0+self.L1];
@@ -253,6 +262,92 @@ classdef Robot < OM_X_arm
             % q = [theta_1 theta_2 theta_3 theta_4];
         end
         
+        % Creates a smooth curve with ramp up and ramp down between two
+        % points over a given time.
+        % INPUTS: 4x4 T matrices for initial and target pos, target time
+        % in seconds, and where the stitch will occur (0 for none, 1 for start, or
+        % 2 for end)
+        % OUTPUTS: nx6 arrays of positions, velocities, and accelerations
+        function [pos_list,vel_list,acc_list] = LSPBUpdated(self,initial_pos,target_pos,target_time,stitch)
+            % Convert orientation to quaternion for interpolation
+            initial_orientation = rotm2eul(initial_pos(1:3,1:3))';
+            target_orientation = rotm2eul(target_pos(1:3,1:3))';
+
+            % Set up calculations
+            t = 0;
+            buffer_percent = 0.2;
+            buffer_time = target_time * buffer_percent;
+            distance =  (initial_pos(1:3,4)-target_pos);
+            target_vel = distance./((1-buffer_percent) * target_time);
+            target_acc = target_vel./buffer_time;
+            current_pos = [initial_orientation;initial_pos(1:3,4)];
+            current_vel = [0;0;0;0;0;0]; % structured [w; v]
+            current_acc = [0;0;0;0;0;0]; 
+            pos_list = [];
+            vel_list = [];
+            acc_list = [];
+            iterations = target_time/self.dt;
+
+            % Recursive calculation
+            for i = 1:iterations
+                t = i*self.dt;
+
+                % Beginning buffer (if applicable)
+                if (time < buffer_time && stitch ~= 1)
+                    current_acc(:) = target_acc;
+                    current_vel = current_vel + (current_acc.*self.dt);
+                    current_pos = current_pos + (current_vel.*self.dt);
+                % Ending buffer (if applicable)
+                elseif (time > buffer_time && stitch ~= 2)
+                    current_acc(:) = -target_acc;
+                    current_vel = current_vel + (current_acc.*self.dt);
+                    current_pos = current_pos + (current_vel.*self.dt);
+                % Linear interpolation
+                else
+                    current_acc(:) = 0;
+                    current_vel = current_vel + (current_acc.*self.dt);
+                    current_pos = current_pos + (current_vel.*self.dt);
+                end
+
+                % Record data
+                pos_arr(i,1:6) = current_pos';
+                vel_arr(i,1:6) = current_vel';
+                acc_arr(i,1:6) = current_acc';
+            end
+        end 
+
+        % Converts cartesian and rotational velocities to joint velocities
+        % INPUTS: Both an nx6 array of positions and velocitiesoutput by
+        % LSPB
+        % OUTPUTS: An nx4 array of joint velocities
+        function [qdot_list] = LSPBtoVelUpdated(self,pos_list,vel_list)
+            for i = 1:size(vel_list)
+                % Compute joint angles from end effector position and euler
+                % angle orientation
+                x = pos_list(i,1);
+                y = pos_list(i,2);
+                z = pos_list(i,3);
+                R = eul2rotm(pos_list(i,4:6));
+                T04 = [[0,0,0,x];
+                        [0,0,0,y];
+                        [0,0,0,z];
+                        [0,0,0,1]];
+                T04(1:3,1:3) = R;
+                [q,s] = self.ikspace(T04);
+                
+                % Compute Body Jacobian at current pose
+                Jb = JacobianBody(self.Blist,q);
+
+                % Calculate joint velocities
+                end_effector_vel = vel_list(i,:)';
+                qdot = pinv(Jb)*end_effector_vel;
+
+                % Store data
+                qdot_list(i,1:4) = qdot';
+            end
+        end
+
+        
         function [pos_arr,vel_arr,acc_arr,z_arr] = LSPB(self,initial_pos,target_pos,target_time)
 
             buffer_percent = 0.2;
@@ -295,8 +390,6 @@ classdef Robot < OM_X_arm
 
         end
         
-        % TODO: fix ikspace input to make it a 4x4 T matrix
-        % TODO: fix recursive algorithm
         function [qdot_arr] = LSPBtoVel(self,pos_arr,vel_arr,z_arr)
                 x = pos_arr(1,1);
                 y = pos_arr(1,2);
