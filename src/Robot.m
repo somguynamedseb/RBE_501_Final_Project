@@ -394,31 +394,81 @@ classdef Robot < OM_X_arm
                 x = pos_arr(1,1);
                 y = pos_arr(1,2);
                 z = pos_arr(1,3);
+                x_tar = pos_arr(end-1,1);
+                y_tar = pos_arr(end-1,2);
+                z_tar = pos_arr(end-1,3); 
                 
-                for i = 1:(size(vel_arr)-1)
-                    theta1 = atan2(y,x);
-                    T04 = [[0,-sin(theta1),-cos(theta1),x];
+                theta1 = atan2(y,x);
+                T04_1 =[[0,-sin(theta1),-cos(theta1),x];
                             [0,cos(theta1),-sin(theta1),y];
                             [1,0,0,z];
                             [0,0,0,1]];
-                    q = self.ikspace(T04);
-                   
-                    jacobian = [
-                        0 0 0 0;
-                        0 1 1 1;
-                        1 0 0 0;
-                        0 0.128 0 0;
-                        0.28 0 0 0;
-                        0 -0.28 -0.25 -0.13;
-                    ]
 
-                    jac_vel = jacobian(4:6, :);
+                theta1 = atan2(y_tar,x_tar);
+                T04_2 = [[0,-sin(theta1),-cos(theta1),x];
+                            [0,cos(theta1),-sin(theta1),y];
+                            [1,0,0,z];
+                            [0,0,0,1]];
+                  
+                    
+                q = self.ikspace(T04_1);
+                q_tar = self.ikspace(T04_2);
+                
+                q_state = q;
+                q_vels = [0,0,0,0];
 
-                    vel = [vel_arr(i,1:3)]';
-                    jb = JacobianBody(jacobian,q)
-                    jbslice = jb(4:6,:)
-                    jbp= pinv(jbslice)
-                    qdot_arr(i,1:4) = (jbp*-vel);
+
+                buffer_percent = 0.2;
+                buffer_time = target_time * buffer_percent;
+                vel_arr = [];
+                acc_arr = [];
+    
+                dist =  (q-q_tar);
+                target_vel = dist/((1-buffer_percent) * target_time);
+                target_acc = target_vel/buffer_time;
+                iterations = target_time/self.dt;
+
+
+                    
+
+
+                for i = 0:iterations
+                    time = i*self.dt;
+                
+                    if time< buffer_time   
+                        q_vels = q_vels + target_acc * self.dt;
+                        q_state = q_state + q_vels * self.dt;
+                    elseif time> target_time - buffer_time   
+                        q_vels = q_vels - target_acc * self.dt;
+                        q_state = q_state + q_vels * self.dt;
+                    else
+                        q_vels = q_vels;
+                        q_state = q_state + q_vels * self.dt
+                    end
+               
+                   z_arr(i+1) = atan2(current_state(2),current_state(1))
+                   pos_arr(i+1,1:3) = (current_state(1:3));
+                   vel_arr(i+1,1:3) = [current_state(4:6)];
+                   acc_arr(i+1,1:3) = (current_state(7:9));
+                end
+    
+                    % jacobian = [
+                    %     0 0 0 0;
+                    %     0 1 1 1;
+                    %     1 0 0 0;
+                    %     0 0.128 0 0;
+                    %     0.28 0 0 0;
+                    %     0 -0.28 -0.25 -0.13;
+                    % ]
+                    % 
+                    % 
+                    % jac_vel = jacobian(4:6, :);
+                    % 
+                    % vel = [vel_arr(i,1:3)]';
+                    % jb = JacobianBody(jacobian,q)
+                    % jbslice = jb(4:6,:)
+                    % jbp= pinv(jbslice)
+                    % qdot_arr(i,1:4) = (jbp*-vel);
                     % qdot_arr(i,1:4) = pinv(jac_vel)*vel_arr(i, 1:3)';
                     % q = q+((qdot_arr(i,1:4))'*self.dt);
                 end
