@@ -390,7 +390,7 @@ classdef Robot < OM_X_arm
 
         end
         
-        function [qdot_arr] = LSPBtoVel(self,pos_arr,vel_arr,z_arr)
+        function [qdot_arr] = LSPBtoVel3(self,pos_arr,vel_arr,z_arr)
                 x = pos_arr(1,1);
                 y = pos_arr(1,2);
                 z = pos_arr(1,3);
@@ -429,9 +429,7 @@ classdef Robot < OM_X_arm
                 iterations = target_time/self.dt;
 
 
-                    
-
-
+                
                 for i = 0:iterations
                     time = i*self.dt;
                 
@@ -446,13 +444,20 @@ classdef Robot < OM_X_arm
                         q_state = q_state + q_vels * self.dt
                     end
                
-                   z_arr(i+1) = atan2(current_state(2),current_state(1))
-                   pos_arr(i+1,1:3) = (current_state(1:3));
-                   vel_arr(i+1,1:3) = [current_state(4:6)];
-                   acc_arr(i+1,1:3) = (current_state(7:9));
+                   z_arr(i+1) = atan2(current_state(2),current_state(1));
+                   pos_arr(i+1,1:4) = (q_state));
+                   vel_arr(i+1,1:4) = (q_vels));
                 end
+                joint1_vel = (q(1)-q_tar(1))/target_time;
+                pos_arr(:,1) = joint_vel;
     
-                    % jacobian = [
+                    
+                end
+            end
+        
+
+
+            % jacobian = [
                     %     0 0 0 0;
                     %     0 1 1 1;
                     %     1 0 0 0;
@@ -471,10 +476,6 @@ classdef Robot < OM_X_arm
                     % qdot_arr(i,1:4) = (jbp*-vel);
                     % qdot_arr(i,1:4) = pinv(jac_vel)*vel_arr(i, 1:3)';
                     % q = q+((qdot_arr(i,1:4))'*self.dt);
-                end
-            end
-        
-
         
     end % end methods
 end % end class

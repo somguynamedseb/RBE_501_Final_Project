@@ -11,7 +11,7 @@ tar_C = [0.185;0;0.24];
 
 % Initialize
 robot = Robot();
-
+s
 % Generate Path
 [pos_arr1, vel_arr1, acc_arr1,z_arr1] = robot.LSPB(tar_A, tar_C, target_time);
 [pos_arr2, vel_arr2, acc_arr2,z_arr2] = robot.LSPB(tar_C, tar_B, target_time);
