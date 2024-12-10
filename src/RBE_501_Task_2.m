@@ -44,7 +44,6 @@ T_C = [[0,0,-1,0.185];
 robot = Robot();
 
 
-
 %% GENERATE PATH
 [ee_pos_arr1, ee_vel_arr1, ee_acc_arr1] = robot.LSPB(tar_A, tar_C, target_time,2);
 [ee_pos_arr2, ee_vel_arr2, ee_acc_arr2] = robot.LSPB(tar_C, tar_B, target_time,1);
