@@ -466,8 +466,8 @@ classdef Robot < OM_X_arm
                     end
                
                    z_arr(i+1) = atan2(current_state(2),current_state(1));
-                   pos_arr(i+1,1:4) = (q_state));
-                   vel_arr(i+1,1:4) = (q_vels));
+                   pos_arr(i+1,1:4) = (q_state);
+                   vel_arr(i+1,1:4) = (q_vels);
                 end
                 joint1_vel = (q(1)-q_tar(1))/target_time;
                 pos_arr(:,1) = joint_vel;
@@ -498,5 +498,5 @@ classdef Robot < OM_X_arm
                     % qdot_arr(i,1:4) = pinv(jac_vel)*vel_arr(i, 1:3)';
                     % q = q+((qdot_arr(i,1:4))'*self.dt);
         
-    end % end methods
+
 end % end class
