@@ -22,6 +22,11 @@ classdef Robot < OM_X_arm
         s3;
         s4;
         Slist;
+        b1;
+        b2;
+        b3;
+        b4;
+        Blist;
         M;
         dt; 
         
@@ -219,6 +224,31 @@ classdef Robot < OM_X_arm
             pause(interTime/1000);
         end
         
+        % Same as interpolate_jp but records currents
+        function [current_arr,t] = interpolate_jp_record(self, values, interTime)
+            % update goal joint positions
+            self.goalJS = values;
+            
+            % set the movement time
+            self.writeTime(interTime / 1000);
+            
+            % write the values
+            self.writeJoints(values);
+
+            % Wait for robot to move while recording currents
+            interval = 0.05; % s
+            time = interTime/1000; % s
+            iterations = time/interval;
+            current_arr = [];
+            t = [];
+            for i = 1:iterations
+                t(i) = (i-1)*interval;
+                currents = self.measured_js(0,0,1);
+                current_arr(i,:) = currents(3,:);
+                pause(interval);
+            end
+        end
+        
         % Gets the joint positions and velocities and returns what the user
         % wants of those data. Data that is not requested is returned as 0s
         % GETPOS [boolean] - True if user wants position data, false
@@ -267,127 +297,118 @@ classdef Robot < OM_X_arm
         % INPUTS: 4x4 T matrices for initial and target pos, target time
         % in seconds, and where the stitch will occur (0 for none, 1 for start, or
         % 2 for end)
-        % OUTPUTS: nx6 arrays of positions, velocities, and accelerations
+        % OUTPUTS: nx4 arrays of joint pos, vel, and acc
         function [pos_list,vel_list,acc_list] = LSPBUpdated(self,initial_pos,target_pos,target_time,stitch)
-            % Convert orientation to quaternion for interpolation
-            initial_orientation = rotm2eul(initial_pos(1:3,1:3))';
-            target_orientation = rotm2eul(target_pos(1:3,1:3))';
+            % Calculate joint positions for both states
+            thetaList_initial = self.ikspace(initial_pos);
+            thetaList_target = self.ikspace(target_pos);
 
-            % Set up calculations
-            t = 0;
-            buffer_percent = 0.2;
-            buffer_time = target_time * buffer_percent;
-            distance =  (initial_pos(1:3,4)-target_pos);
-            target_vel = distance./((1-buffer_percent) * target_time);
-            target_acc = target_vel./buffer_time;
-            current_pos = [initial_orientation;initial_pos(1:3,4)];
-            current_vel = [0;0;0;0;0;0]; % structured [w; v]
-            current_acc = [0;0;0;0;0;0]; 
             pos_list = [];
             vel_list = [];
             acc_list = [];
+            t = 0;
+            buffer_percent = 0.2;
+            buffer_time = target_time * buffer_percent;
             iterations = target_time/self.dt;
-
-            % Recursive calculation
-            for i = 1:iterations
-                t = i*self.dt;
-
-                % Beginning buffer (if applicable)
-                if (time < buffer_time && stitch ~= 1)
-                    current_acc(:) = target_acc;
-                    current_vel = current_vel + (current_acc.*self.dt);
-                    current_pos = current_pos + (current_vel.*self.dt);
-                % Ending buffer (if applicable)
-                elseif (time > buffer_time && stitch ~= 2)
-                    current_acc(:) = -target_acc;
-                    current_vel = current_vel + (current_acc.*self.dt);
-                    current_pos = current_pos + (current_vel.*self.dt);
-                % Linear interpolation
-                else
-                    current_acc(:) = 0;
-                    current_vel = current_vel + (current_acc.*self.dt);
-                    current_pos = current_pos + (current_vel.*self.dt);
+            
+            % Run calculation for each joint
+            for i = 1:4
+                % Set up calculations
+                theta_initial = thetaList_initial(i);
+                theta_target = thetaList_target(i);
+                distance = theta_target - theta_initial;
+                target_vel = distance/((1-buffer_percent) * target_time);
+                if (stitch ~= 0 && i == 1) % correct for stitching
+                    target_vel = distance/((1-(buffer_percent/2)) * target_time);
                 end
-
-                % Record data
-                pos_arr(i,1:6) = current_pos';
-                vel_arr(i,1:6) = current_vel';
-                acc_arr(i,1:6) = current_acc';
+                target_acc = target_vel/buffer_time;
+                current_pos = theta_initial;
+                current_vel = 0;
+                current_acc = 0; 
+    
+                % Recursive calculation
+                for j = 1:iterations
+                    t = j*self.dt;
+    
+                    % Beginning buffer (if applicable)
+                    if (t < buffer_time && ~(i==1 && stitch == 1))
+                        current_acc = target_acc;
+                        current_vel = current_vel + (current_acc*self.dt);
+                        current_pos = current_pos + (current_vel*self.dt);
+                    % Ending buffer (if applicable)
+                    elseif (t > target_time - buffer_time && ~(i == 1 && stitch == 2))
+                        current_acc = -target_acc;
+                        current_vel = current_vel + (current_acc*self.dt);
+                        current_pos = current_pos + (current_vel*self.dt);
+                    % Linear interpolation
+                    else
+                        current_acc = 0;
+                        current_vel = target_vel;
+                        current_pos = current_pos + (current_vel*self.dt);
+                    end
+    
+                    % Record data
+                    pos_list(j,i) = current_pos;
+                    vel_list(j,i) = current_vel;
+                    acc_list(j,i) = current_acc;
+                end
             end
         end 
 
-        % Converts cartesian and rotational velocities to joint velocities
-        % INPUTS: Both an nx6 array of positions and velocitiesoutput by
-        % LSPB
-        % OUTPUTS: An nx4 array of joint velocities
-        function [qdot_list] = LSPBtoVelUpdated(self,pos_list,vel_list)
-            for i = 1:size(vel_list)
-                % Compute joint angles from end effector position and euler
-                % angle orientation
-                x = pos_list(i,1);
-                y = pos_list(i,2);
-                z = pos_list(i,3);
-                R = eul2rotm(pos_list(i,4:6));
-                T04 = [[0,0,0,x];
-                        [0,0,0,y];
-                        [0,0,0,z];
-                        [0,0,0,1]];
-                T04(1:3,1:3) = R;
-                [q,s] = self.ikspace(T04);
-                
-                % Compute Body Jacobian at current pose
-                Jb = JacobianBody(self.Blist,q);
-
-                % Calculate joint velocities
-                end_effector_vel = vel_list(i,:)';
-                qdot = pinv(Jb)*end_effector_vel;
-
-                % Store data
-                qdot_list(i,1:4) = qdot';
-            end
-        end
+ 
 
         
-        function [pos_arr,vel_arr,acc_arr,z_arr] = LSPB(self,initial_pos,target_pos,target_time)
-
-            buffer_percent = 0.2;
+        function [pos_arr,vel_arr,acc_arr] = LSPB(self,initial_pos,target_pos,target_time,stitch)
+            % Initialize variables
+            buffer_percent = 0.22;
             buffer_time = target_time * buffer_percent;
-            initial_pos = initial_pos.'
-            target_pos = target_pos.'
-            current_state = [initial_pos,0,0,0,0,0,0]; %x,y,z,vx,vy,vz,ax,ay,az
+            current_state = [initial_pos;0;0;0;0;0;0]; %x,y,z,vx,vy,vz,ax,ay,az
             pos_arr = [];
             vel_arr = [];
             acc_arr = [];
-
-            dist =  (current_state(1:3)-target_pos);
-            target_vel = dist/((1-buffer_percent) * target_time);
+            
+            % Find target metrics
+            distance = target_pos - initial_pos;
+            target_vel = distance/((1-buffer_percent) * target_time);
+            if (stitch ~= 0) % correct for stitching
+                target_vel(1) = distance(1)/((1-(buffer_percent/2)) * target_time);
+            end
             target_acc = target_vel/buffer_time;
             iterations = target_time/self.dt;
 
             for i = 0:iterations
                 time = i*self.dt;
             
-                if time< buffer_time   
+                if (time < buffer_time && stitch ~= 1)
                     current_state(7:9) = target_acc;
                     current_state(4:6) = current_state(4:6) + current_state(7:9) * self.dt;
                     current_state(1:3) = current_state(1:3) + current_state(4:6) * self.dt;
-                elseif time> target_time - buffer_time   
+                elseif (time < buffer_time)
+                    current_state(7:9) = target_acc;
+                    current_state(8) = 0;
+                    current_state(4:6) = current_state(4:6) + current_state(7:9) * self.dt;
+                    current_state(5) = target_vel(2);
+                    current_state(1:3) = current_state(1:3) + current_state(4:6) * self.dt;
+                elseif (time > target_time - buffer_time && stitch ~= 2)
                     current_state(7:9) = -target_acc;
                     current_state(4:6) = current_state(4:6) + current_state(7:9) * self.dt;
                     current_state(1:3) = current_state(1:3) + current_state(4:6) * self.dt;
+                elseif (time > target_time - buffer_time)
+                    current_state(7:9) = -target_acc;
+                    current_state(8) = 0;
+                    current_state(4:6) = current_state(4:6) + current_state(7:9) * self.dt;
+                    current_state(5) = target_vel(2);
+                    current_state(1:3) = current_state(1:3) + current_state(4:6) * self.dt;
                 else
                     current_state(7:9) = 0;
-                    current_state(4:6) = current_state(4:6);
+                    current_state(4:6) = target_vel;
                     current_state(1:3) = current_state(1:3) + current_state(4:6) * self.dt;
                 end
                
-               z_arr(i+1) = atan2(current_state(2),current_state(1))
-               pos_arr(i+1,1:3) = (current_state(1:3));
-               vel_arr(i+1,1:3) = [current_state(4:6)];
-               acc_arr(i+1,1:3) = (current_state(7:9));
+               pos_arr(i+1,1:3) = current_state(1:3);
+               vel_arr(i+1,1:3) = current_state(4:6);
+               acc_arr(i+1,1:3) = current_state(7:9);
             end
-            % plot(vel_arr)
-
         end
         
         function [qdot_arr] = LSPBtoVel3(self,pos_arr,vel_arr,z_arr)
