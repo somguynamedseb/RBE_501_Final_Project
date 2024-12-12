@@ -41,12 +41,6 @@ robot.writeMode('p');
 % Input home configuration (rows)
 M = [[0, 0, -1, l3+l4+l5]; [0, 1, 0, 0]; [1, 0, 0, l1+l2]; [0, 0, 0, 1]];
 
-% Input twists at home configuration (columns)
-Slist = [[0; 0; 1; 0; 0; 0], ...
-         [0; 1; 0; -l1; 0; 0], ...
-         [0; 1; 0; -l1-l2; 0; l3], ...
-         [0; 1; 0; -l1-l2; 0; l3+l4]];
-
 % Input Mlist
 M01 = [[1, 0, 0, 0]; [0, 1, 0, 0]; [0, 0, 1, 0.0354]; [0, 0, 0, 1]];
 M12 = [[1, 0, 0, 0.003809]; [0, 1, 0, 0]; [0, 0 ,1, 0.163326]; [0, 0, 0, 1]];
@@ -103,17 +97,18 @@ G4 =  [[Ixx4, Ixy4, Ixz4, 0, 0, 0]; [Ixy4, Iyy4, Iyz4, 0, 0, 0]; ...
 Glist = cat(3, G1, G2, G3, G4);
 
 % Input wrench at end effector
-Ftip = [0; 0; 0; 0; 0; 0]; % N*m, N
+Ftip = [0; 0; 0; 0; 1; 0]; % N*m, N
 
 %% CALCULATE
 % Compute joint torques
 taulist = InverseDynamics(thetalist, dthetalist, ddthetalist, g, ...
-                        Ftip, Mlist, Glist, Slist) % N*m
+                        Ftip, Mlist, Glist, robot.Slist) % N*m
 
 % Move robot to position of calculated torques
 robot.interpolate_jp(thetalist,2000);
 
 % Read joint currents
+pause(2)
 j_cur = robot.measured_js(0,0,1)./1000; % A
 pause(1)
 

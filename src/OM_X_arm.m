@@ -134,11 +134,11 @@ classdef OM_X_arm < handle
                     end
         
                     % Subtract offsets after reading for motors 2 and 3
-                    if id == self.motorIDs(2)
-                        result(i) = result(i) - self.motor2_offset;
-                    elseif id == self.motorIDs(3)
-                        result(i) = result(i) - self.motor3_offset;
-                    end
+                    % if id == self.motorIDs(2)
+                    %     result(i) = result(i) - self.motor2_offset;
+                    % elseif id == self.motorIDs(3)
+                    %     result(i) = result(i) - self.motor3_offset;
+                    % end
                 end
         
             else % Bulk Write if msgs exists

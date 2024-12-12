@@ -23,13 +23,18 @@ close all
 robot = Robot();
 
 % Initialize inputs
-T_con = 2.0746; %% Amps per Nm
+T_con = 2.1; %% Amps per Nm
 thetalist = [0,0,0,0]; % rad
+correction_factor_Y = 25; % Fixes the disparity in y-direction readouts
+
+
 
 %% MOVE ROBOT
 pause(0.5)
 robot.interpolate_jp(thetalist, 2000)
 pause(3)
+vals = robot.measured_js(0,0,1);
+pause(1)
 
 %% MAIN LOOP
 firstRun = 1;
@@ -56,7 +61,7 @@ while 1
 
     % Print result (either motor torques or wrench on end effector)
     % fprintf('Motor Torques: %5.4f %5.4f %5.4f %5.4f\n',torque_est(1),torque_est(2),torque_est(3),torque_est(4))
-    fprintf('Wrench on End Effector: %5.4f %5.4f %5.4f %5.4f %5.4f %5.4f\n',-Ftip(1),-Ftip(2),-Ftip(3),-Ftip(4),-Ftip(5),-Ftip(6))
+    fprintf('Linear Wrench on End Effector in Base Frame: %5.4f %5.4f %5.4f\n',Ftip(6),-Ftip(5)*correction_factor_Y,-Ftip(4))
     
-    pause(0.1)
+    pause(0.5)
 end

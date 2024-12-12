@@ -15,7 +15,7 @@ clear;
 %% SETUP
 % Input speed of A to B movement in seconds (used for task 1 data
 % collection)
-run_time = 1000/0.4;
+run_time = 1000/1.0;
 
 % Set up robot and go home
 robot = Robot();
